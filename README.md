@@ -1,0 +1,3 @@
+# HeroesWMBot
+
+Бот для HeroesWM
