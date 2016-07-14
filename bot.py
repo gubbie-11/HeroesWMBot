@@ -338,7 +338,26 @@ def loadacc():
 	config.read(sys.path[0] + '/acc.ini')
 	DATA = [config['USER']['login'], config['USER']['pass'], config['USER']['token'], config['USER']['botid'], config['USER']['chat']]
 
+def setup_console(sys_enc="utf-8"):
+	import codecs
+	try:
+		if sys.platform.startswith("win"):
+			import ctypes
+			enc = "cp%d" % ctypes.windll.kernel32.GetOEMCP()
+		else:
+			enc = (sys.stdout.encoding if sys.stdout.isatty() else
+						sys.stderr.encoding if sys.stderr.isatty() else
+							sys.getfilesystemencoding() or sys_enc)
+		sys.setdefaultencoding(sys_enc)
+		if sys.stdout.isatty() and sys.stdout.encoding != enc:
+			sys.stdout = codecs.getwriter(enc)(sys.stdout, 'replace')
+		if sys.stderr.isatty() and sys.stderr.encoding != enc:
+			sys.stderr = codecs.getwriter(enc)(sys.stderr, 'replace')
+	except:
+		pass
+
 if __name__ == '__main__':
+	setup_console()
 	try:
 		flag = int(sys.argv[1])
 	except:
