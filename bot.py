@@ -37,6 +37,9 @@ class bot():
 
 		Автоматическая проверка шахты и аккаунта каждые 5 минут.
 		'''
+#		self.auth()
+#		self.auto()
+#		exit()
 		self.monitor()
 
 	def auth(self):
@@ -54,25 +57,7 @@ class bot():
 		self.cookies = data.cookies
 		print(self.cookies)
 
-	def profile(self):
-		data = requests.get('http://www.heroeswm.ru/home.php', headers=self.headers, cookies=self.cookies, allow_redirects=False)
-		data.encoding = 'windows-1251'
-		tables = re.findall(r'<td>([,\d]+)</td>', data.text)
-		if not tables:
-			self.authorized = False
-			return False
-		else:
-			self.profile_data = tables
-			return True
-
-	def shaht(self, caid):
-		data = requests.get('http://www.heroeswm.ru/object-info.php?id=' + caid, headers=self.headers, cookies=self.cookies, allow_redirects=False)
-		data.encoding = 'windows-1251'
-		requests.cookies.merge_cookies(self.cookies, data.cookies)
-		soup = BeautifulSoup(data.text, 'html.parser')
-		tab = soup.find('td', {'width': '100%', 'valign': 'top', 'align': 'left'})
-		tab = tab.stripped_strings if tab else []
-		tab = [x for x in tab]
+	def getParamsFromShaht(self, tab):
 		i = 0
 		tables = []
 		tmp = ''
@@ -94,7 +79,56 @@ class bot():
 			else:
 				tables.append(tab[i])
 				i += 1
-		# спасибо
+		return tables
+		
+	def auto(self):
+		
+		arr_can_dig = []
+		
+		print('Start search..')
+		
+		data_pr = requests.get('http://www.heroeswm.ru/map.php?st=mn', headers=self.headers, cookies=self.cookies, allow_redirects=False)
+		data_pr.encoding = 'windows-1251'
+		data = requests.get('http://www.heroeswm.ru/map.php?st=sh', headers=self.headers, cookies=self.cookies, allow_redirects=False)
+		data.encoding = 'windows-1251'
+		tmp_pr = re.findall(r'object-info\.php\?id=(\d+)', data_pr.text)
+		tmp = re.findall(r'object-info\.php\?id=(\d+)', data.text)
+		ids = [e for i,e in enumerate( tmp ) if e not in tmp[:i]] + [e for i,e in enumerate( tmp_pr ) if e not in tmp_pr[:i]]
+		for q in ids:
+			data = requests.get('http://www.heroeswm.ru/object-info.php?id=' + q, headers=self.headers, cookies=self.cookies, allow_redirects=False)
+			data.encoding = 'windows-1251'
+			if 'Введите код с картинки и нажмите кнопку' in data.text:
+				soup = BeautifulSoup(data.text, 'html.parser')
+				tab = soup.find('td', {'width': '100%', 'valign': 'top', 'align': 'left'})
+				tab = tab.stripped_strings if tab else []
+				tab = [x for x in tab]
+				tab = self.getParamsFromShaht(tab)
+				arr_can_dig.append( 'Шахта #' + q + '\t | \t' + tab[5] + ' &#128176;')
+				print('Can work in', q, 'shaht')
+		return arr_can_dig
+			
+		
+	def profile(self):
+		data = requests.get('http://www.heroeswm.ru/home.php', headers=self.headers, cookies=self.cookies, allow_redirects=False)
+		data.encoding = 'windows-1251'
+		tables = re.findall(r'<td>([,\d]+)</td>', data.text)
+		if not tables:
+			self.authorized = False
+			return False
+		else:
+			self.profile_data = tables
+			return True
+
+	
+	def shaht(self, caid):
+		data = requests.get('http://www.heroeswm.ru/object-info.php?id=' + caid, headers=self.headers, cookies=self.cookies, allow_redirects=False)
+		data.encoding = 'windows-1251'
+		requests.cookies.merge_cookies(self.cookies, data.cookies)
+		soup = BeautifulSoup(data.text, 'html.parser')
+		tab = soup.find('td', {'width': '100%', 'valign': 'top', 'align': 'left'})
+		tab = tab.stripped_strings if tab else []
+		tab = [x for x in tab]
+		tables = self.getParamsFromShaht(tab)
 		tables = '\n&#9643; '.join(tables)
 		self.captcha = ''
 		if 'Введите код с картинки и нажмите кнопку' in data.text:
@@ -139,6 +173,9 @@ class bot():
 			sys.stderr.flush()
 			sys.stdout.flush()
 			data = request('messages.get', {'out': 0, 'count': 1})
+			if not 'response' in data:
+				print('Error loading messages..')
+				continue
 			for q in data['response']['items']:
 				uid = q['user_id']
 				r = q['read_state']
@@ -223,6 +260,21 @@ class bot():
 									sendmsg(uid, cid, '&#9940; Вы не можете сейчас работать.')
 							else:
 								sendmsg(uid, cid, '&#9940; Не выбрана шахта.')
+						else:
+							sendmsg(uid, cid, '&#9940; Не авторизован.')
+					elif re.match(r'Поиск', body, re.I):
+						if self.authorized:
+							if self.canwork != 2:
+								tmp = '&#128347;,&#128359;,&#128336;,&#128348;,&#128337;,&#128349;,&#128338;,&#128350;,&#128339;,&#128351;,&#128340;,&#128352;,&#128341;,&#128342;,&#128343;,&#128344;,&#128345;,&#128346;,&#128353;,&#128354;,&#128355;,&#128356;,&#128357;,&#128358;'.split(',')
+								emoj = random.choice(tmp)
+								sendmsg(uid, cid, emoj + ' Поиск займет некоторое время.')
+								arr_s = self.auto()
+								if len(arr_s) > 0:
+									sendmsg(uid, cid, '&#9989; Список доступных шахт:\n\n&#9643; ' + '\n&#9643; '.join(arr_s))
+								else:
+									sendmsg(uid, cid, '&#9940; Не было найдено подходящих шахт.')
+							else:
+								sendmsg(uid, cid, '&#9940; Сейчас нельзя искать шахты.')
 						else:
 							sendmsg(uid, cid, '&#9940; Не авторизован.')
 					else:
@@ -355,7 +407,7 @@ def setup_console(sys_enc="utf-8"):
 			sys.stderr = codecs.getwriter(enc)(sys.stderr, 'replace')
 	except:
 		pass
-
+	
 if __name__ == '__main__':
 	setup_console()
 	try:
